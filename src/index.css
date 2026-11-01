@@ -1,45 +1,86 @@
 @import "tailwindcss";
 
 @layer base {
+  :root {
+    --color-primary: #800706;
+    --color-primary-dark: #5a0504;
+    --color-secondary: #c09f80;
+    --color-secondary-light: #d4b89a;
+    --color-accent: #ffd700;
+  }
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
   }
   
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #f9fafb;
+    color: #1f2937;
   }
 
-  /* Custom scrollbar */
+  /* Scrollbar personalizada */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
   
   ::-webkit-scrollbar-track {
-    background: transparent;
+    background: #f1f1f1;
   }
   
   ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 3px;
+    background: #c09f80;
+    border-radius: 4px;
   }
   
   ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: #800706;
   }
 
-  /* Toggle switch fix */
-  input[type="checkbox"]:checked + div {
-    background-color: #2563eb;
+  /* Melhorias para mobile */
+  @media (max-width: 768px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+    
+    button {
+      min-height: 44px;
+    }
+  }
+
+  /* Animações suaves */
+  * {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+}
+
+@layer utilities {
+  .text-primary {
+    color: #800706;
   }
   
-  input[type="checkbox"]:checked ~ div:last-child {
-    transform: translateX(1.25rem);
+  .bg-primary {
+    background-color: #800706;
   }
-
-  /* Details/summary marker removal */
-  details summary::-webkit-details-marker {
-    display: none;
+  
+  .border-primary {
+    border-color: #800706;
+  }
+  
+  .text-secondary {
+    color: #c09f80;
+  }
+  
+  .bg-secondary {
+    background-color: #c09f80;
+  }
+  
+  .border-secondary {
+    border-color: #c09f80;
   }
 }

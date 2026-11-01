@@ -1,211 +1,112 @@
-import { Document, ActivityLog } from './types';
+import { User, Delegacao, Emolumento } from './types';
 
-export const mockDocuments: Document[] = [
+// Utilizadores padrão
+export const defaultUsers: User[] = [
   {
     id: '1',
-    numero: '0001234-56.2024.8.26.0100',
-    titulo: 'Ação de Indenização por Danos Morais',
-    tipo: 'peticao',
-    status: 'em_andamento',
-    prioridade: 'alta',
-    vara: '1ª Vara Cível',
-    comarca: 'São Paulo',
-    area: 'civil',
-    partes: ['João Silva (Autor)', 'Empresa XYZ Ltda (Réu)'],
-    descricao: 'Pedido de indenização por danos morais decorrentes de cobrança indevida.',
-    dataCriacao: '2024-01-15',
-    dataAtualizacao: '2024-03-20',
-    responsavel: 'Dr. Carlos Mendes',
-    anexos: 12,
-    observacoes: 'Aguardando contestação do réu.'
+    username: 'admin',
+    email: 'admin@mjdh.gov.ao',
+    password: 'admin2026',
+    nome: 'Administrador do Sistema',
+    perfil: 'admin',
+    areas: ['todos'],
+    criadoEm: '2024-01-01',
+    ultimoAcesso: new Date().toISOString()
   },
   {
     id: '2',
-    numero: '0005678-90.2024.8.26.0100',
-    titulo: 'Processo Criminal - Furto Qualificado',
-    tipo: 'sentenca',
-    status: 'concluso',
-    prioridade: 'urgente',
-    vara: '2ª Vara Criminal',
-    comarca: 'São Paulo',
-    area: 'criminal',
-    partes: ['Ministério Público (Autor)', 'Pedro Santos (Réu)'],
-    descricao: 'Sentença proferida em processo de furto qualificado.',
-    dataCriacao: '2024-02-10',
-    dataAtualizacao: '2024-03-25',
-    responsavel: 'Dra. Ana Beatriz',
-    anexos: 28,
-    observacoes: 'Sentença publicada em 25/03/2024.'
-  },
-  {
-    id: '3',
-    numero: '0009012-34.2024.8.26.0100',
-    titulo: 'Reclamação Trabalhista - Horas Extras',
-    tipo: 'peticao',
-    status: 'em_andamento',
-    prioridade: 'media',
-    vara: '3ª Vara do Trabalho',
-    comarca: 'Campinas',
-    area: 'trabalho',
-    partes: ['Maria Oliveira (Reclamante)', 'Tech Solutions S.A. (Reclamada)'],
-    descricao: 'Reclamação trabalhista referente ao pagamento de horas extras não quitadas.',
-    dataCriacao: '2024-01-20',
-    dataAtualizacao: '2024-03-18',
-    responsavel: 'Dr. Roberto Lima',
-    anexos: 8,
-    observacoes: 'Audiência de instrução marcada para 15/04/2024.'
-  },
-  {
-    id: '4',
-    numero: '0003456-78.2024.8.26.0100',
-    titulo: 'Divórcio Consensual com Partilha',
-    tipo: 'peticao',
-    status: 'aguardando',
-    prioridade: 'baixa',
-    vara: '1ª Vara de Família',
-    comarca: 'São Paulo',
-    area: 'familia',
-    partes: ['Carlos Ferreira', 'Ana Ferreira'],
-    descricao: 'Pedido de divórcio consensual com partilha de bens.',
-    dataCriacao: '2024-03-01',
-    dataAtualizacao: '2024-03-22',
-    responsavel: 'Dra. Patrícia Souza',
-    anexos: 5,
-    observacoes: 'Aguardando homologação do acordo.'
-  },
-  {
-    id: '5',
-    numero: '0007890-12.2024.8.26.0100',
-    titulo: 'Mandado de Segurança - Concurso Público',
-    tipo: 'despacho',
-    status: 'despachado',
-    prioridade: 'alta',
-    vara: '1ª Vara da Fazenda Pública',
-    comarca: 'São Paulo',
-    area: 'fazenda',
-    partes: ['Lucas Almeida (Impetrante)', 'Estado de São Paulo (Impetrado)'],
-    descricao: 'Mandado de segurança visando a nomeação em concurso público.',
-    dataCriacao: '2024-02-15',
-    dataAtualizacao: '2024-03-19',
-    responsavel: 'Dr. Fernando Costa',
-    anexos: 15,
-    observacoes: 'Liminar deferida. Aguardando informações da autoridade coatora.'
-  },
-  {
-    id: '6',
-    numero: '0002345-67.2024.8.26.0100',
-    titulo: 'Execução Fiscal - IPTU',
-    tipo: 'certidao',
-    status: 'em_andamento',
-    prioridade: 'media',
-    vara: '2ª Vara da Fazenda Pública',
-    comarca: 'Guarulhos',
-    area: 'fazenda',
-    partes: ['Município de Guarulhos (Exequente)', 'Construtora ABC Ltda (Executada)'],
-    descricao: 'Execução fiscal referente a débitos de IPTU dos exercícios 2020-2023.',
-    dataCriacao: '2024-01-05',
-    dataAtualizacao: '2024-03-15',
-    responsavel: 'Dra. Juliana Martins',
-    anexos: 20,
-    observacoes: 'Penhora de bens deferida.'
-  },
-  {
-    id: '7',
-    numero: '0006789-01.2024.8.26.0100',
-    titulo: 'Recurso de Apelação - Contrato',
-    tipo: 'recurso',
-    status: 'em_andamento',
-    prioridade: 'alta',
-    vara: '4ª Vara Cível',
-    comarca: 'São Paulo',
-    area: 'civil',
-    partes: ['Empresa Delta S.A. (Apelante)', 'Fornecedor Beta Ltda (Apelado)'],
-    descricao: 'Recurso de apelação contra sentença que julgou procedente ação de rescisão contratual.',
-    dataCriacao: '2024-02-28',
-    dataAtualizacao: '2024-03-21',
-    responsavel: 'Dr. Marcos Ribeiro',
-    anexos: 35,
-    observacoes: 'Contrarrazões apresentadas. Aguardando julgamento.'
-  },
-  {
-    id: '8',
-    numero: '0004567-89.2024.8.26.0100',
-    titulo: 'Ata de Audiência - Instrução Processual',
-    tipo: 'ata',
-    status: 'arquivado',
-    prioridade: 'baixa',
-    vara: '5ª Vara Cível',
-    comarca: 'São Paulo',
-    area: 'civil',
-    partes: ['Roberto Nunes (Autor)', 'Seguradora Gamma S.A. (Ré)'],
-    descricao: 'Ata de audiência de instrução e julgamento.',
-    dataCriacao: '2024-01-10',
-    dataAtualizacao: '2024-02-28',
-    responsavel: 'Dra. Camila Dias',
-    anexos: 3,
-    observacoes: 'Processo arquivado após trânsito em julgado.'
-  },
-  {
-    id: '9',
-    numero: '0008901-23.2024.8.26.0100',
-    titulo: 'Parecer Técnico - Perícia Médica',
-    tipo: 'parecer',
-    status: 'concluso',
-    prioridade: 'media',
-    vara: '6ª Vara do Trabalho',
-    comarca: 'Osasco',
-    area: 'trabalho',
-    partes: ['Fernanda Lima (Reclamante)', 'Indústria Nacional S.A. (Reclamada)'],
-    descricao: 'Parecer técnico de perícia médica em ação de acidente de trabalho.',
-    dataCriacao: '2024-02-05',
-    dataAtualizacao: '2024-03-10',
-    responsavel: 'Dr. André Nascimento',
-    anexos: 18,
-    observacoes: 'Perícia concluída. Laudo favorável à reclamante.'
-  },
-  {
-    id: '10',
-    numero: '0001122-33.2024.8.26.0100',
-    titulo: 'Ofício - Requisição de Informações',
-    tipo: 'oficio',
-    status: 'aguardando',
-    prioridade: 'urgente',
-    vara: '1ª Vara Criminal',
-    comarca: 'São Paulo',
-    area: 'criminal',
-    partes: ['Ministério Público', 'Polícia Civil - DHPP'],
-    descricao: 'Ofício requisitando informações complementares sobre inquérito policial.',
-    dataCriacao: '2024-03-18',
-    dataAtualizacao: '2024-03-22',
-    responsavel: 'Dr. Paulo Henrique',
-    anexos: 2,
-    observacoes: 'Prazo de resposta: 10 dias.'
+    username: 'text',
+    email: 'text@mjdh.gov.ao',
+    password: 'text2026',
+    nome: 'Utilizador Padrão',
+    perfil: 'super_user',
+    areas: ['registo-nascimento', 'emissao-bi', 'registo-criminal', 'cartorio-notarial', 'registo-automovel', 'cofre-geral', 'delegacoes', 'gestao-documental'],
+    criadoEm: '2024-01-01',
+    ultimoAcesso: new Date().toISOString()
   }
 ];
 
-export const mockActivities: ActivityLog[] = [
-  { id: '1', acao: 'Documento criado', documento: '0001234-56.2024.8.26.0100', usuario: 'Dr. Carlos Mendes', data: '2024-03-22 14:30', tipo: 'criacao' },
-  { id: '2', acao: 'Anexo adicionado', documento: '0005678-90.2024.8.26.0100', usuario: 'Dra. Ana Beatriz', data: '2024-03-22 11:15', tipo: 'anexo' },
-  { id: '3', acao: 'Status atualizado', documento: '0009012-34.2024.8.26.0100', usuario: 'Dr. Roberto Lima', data: '2024-03-21 16:45', tipo: 'atualizacao' },
-  { id: '4', acao: 'Despacho proferido', documento: '0007890-12.2024.8.26.0100', usuario: 'Dr. Fernando Costa', data: '2024-03-21 10:00', tipo: 'despacho' },
-  { id: '5', acao: 'Movimentação registrada', documento: '0006789-01.2024.8.26.0100', usuario: 'Dra. Juliana Martins', data: '2024-03-20 09:30', tipo: 'movimentacao' },
-  { id: '6', acao: 'Documento criado', documento: '0001122-33.2024.8.26.0100', usuario: 'Dr. Paulo Henrique', data: '2024-03-20 08:00', tipo: 'criacao' },
-  { id: '7', acao: 'Anexo adicionado', documento: '0008901-23.2024.8.26.0100', usuario: 'Dr. André Nascimento', data: '2024-03-19 15:20', tipo: 'anexo' },
-  { id: '8', acao: 'Status atualizado', documento: '0003456-78.2024.8.26.0100', usuario: 'Dra. Patrícia Souza', data: '2024-03-19 14:00', tipo: 'atualizacao' },
+// 21 Províncias de Angola (incluindo as 4 novas de 2025)
+export const delegacoes: Delegacao[] = [
+  { id: '1', provincia: 'Bengo', capital: 'Caxito', funcionarios: 15, processos: 82, nova: false },
+  { id: '2', provincia: 'Benguela', capital: 'Lobito', funcionarios: 22, processos: 145, nova: false },
+  { id: '3', provincia: 'Bié', capital: 'Kuito', funcionarios: 18, processos: 98, nova: false },
+  { id: '4', provincia: 'Cabinda', capital: 'Cabinda', funcionarios: 20, processos: 112, nova: false },
+  { id: '5', provincia: 'Cuando', capital: 'Menongue', funcionarios: 14, processos: 67, nova: true },
+  { id: '6', provincia: 'Cubango', capital: 'Cuito Cuanavale', funcionarios: 12, processos: 54, nova: true },
+  { id: '7', provincia: 'Cuanza Norte', capital: 'Ndalatando', funcionarios: 16, processos: 89, nova: false },
+  { id: '8', provincia: 'Cuanza Sul', capital: 'Sumbe', funcionarios: 17, processos: 94, nova: false },
+  { id: '9', provincia: 'Cunene', capital: 'Ondjiva', funcionarios: 15, processos: 78, nova: false },
+  { id: '10', provincia: 'Huambo', capital: 'Huambo', funcionarios: 24, processos: 156, nova: false },
+  { id: '11', provincia: 'Huíla', capital: 'Lubango', funcionarios: 21, processos: 134, nova: false },
+  { id: '12', provincia: 'Ícolo e Bengo', capital: 'Ícolo e Bengo', funcionarios: 13, processos: 61, nova: true },
+  { id: '13', provincia: 'Luanda', capital: 'Luanda', funcionarios: 35, processos: 245, nova: false },
+  { id: '14', provincia: 'Lunda Norte', capital: 'Dundo', funcionarios: 16, processos: 87, nova: false },
+  { id: '15', provincia: 'Lunda Sul', capital: 'Saurimo', funcionarios: 15, processos: 82, nova: false },
+  { id: '16', provincia: 'Malanje', capital: 'Malanje', funcionarios: 17, processos: 93, nova: false },
+  { id: '17', provincia: 'Moxico', capital: 'Luena', funcionarios: 14, processos: 71, nova: false },
+  { id: '18', provincia: 'Moxico Leste', capital: 'Caiundo', funcionarios: 12, processos: 58, nova: true },
+  { id: '19', provincia: 'Namibe', capital: 'Moçâmedes', funcionarios: 16, processos: 85, nova: false },
+  { id: '20', provincia: 'Uíge', capital: 'Uíge', funcionarios: 18, processos: 96, nova: false },
+  { id: '21', provincia: 'Zaire', capital: 'Mbanza-Kongo', funcionarios: 15, processos: 79, nova: false }
 ];
 
-export const varas = [
-  '1ª Vara Cível', '2ª Vara Cível', '3ª Vara Cível', '4ª Vara Cível', '5ª Vara Cível',
-  '1ª Vara Criminal', '2ª Vara Criminal', '3ª Vara Criminal',
-  '1ª Vara do Trabalho', '2ª Vara do Trabalho', '3ª Vara do Trabalho',
-  '1ª Vara de Família', '2ª Vara de Família',
-  '1ª Vara da Fazenda Pública', '2ª Vara da Fazenda Pública'
+// Tabela de emolumentos (Decretos 300/19 e 301/19)
+export const emolumentos: Emolumento[] = [
+  // Registo Civil
+  { id: '1', codigo: 'RC001', descricao: 'Registo de Nascimento', valor: 2500, dominio: 'registo-civil', isento: false },
+  { id: '2', codigo: 'RC002', descricao: 'Registo de Casamento', valor: 5000, dominio: 'registo-civil', isento: false },
+  { id: '3', codigo: 'RC003', descricao: 'Registo de Óbito', valor: 2500, dominio: 'registo-civil', isento: false },
+  { id: '4', codigo: 'RC004', descricao: 'Certidão de Nascimento', valor: 1500, dominio: 'registo-civil', isento: false },
+  
+  // Identificação Civil
+  { id: '5', codigo: 'IC001', descricao: 'Emissão de BI (1ª vez)', valor: 3500, dominio: 'identificacao', isento: false },
+  { id: '6', codigo: 'IC002', descricao: 'Emissão de BI (2ª vez)', valor: 5000, dominio: 'identificacao', isento: false },
+  { id: '7', codigo: 'IC003', descricao: 'Duplicado de BI', valor: 7500, dominio: 'identificacao', isento: false },
+  
+  // Registo Criminal
+  { id: '8', codigo: 'RCR001', descricao: 'Certificado do Registo Criminal', valor: 3000, dominio: 'registo-criminal', isento: false },
+  { id: '9', codigo: 'RCR002', descricao: 'Certificado para fins de emprego', valor: 2000, dominio: 'registo-criminal', isento: false },
+  
+  // Cartório Notarial
+  { id: '10', codigo: 'CN001', descricao: 'Escritura Pública', valor: 15000, dominio: 'cartorio', isento: false },
+  { id: '11', codigo: 'CN002', descricao: 'Reconhecimento de Assinatura', valor: 1000, dominio: 'cartorio', isento: false },
+  { id: '12', codigo: 'CN003', descricao: 'Autenticação de Documento', valor: 1500, dominio: 'cartorio', isento: false },
+  
+  // Registo Automóvel
+  { id: '13', codigo: 'RA001', descricao: 'Registo de Viatura Nova', valor: 25000, dominio: 'registo-automovel', isento: false },
+  { id: '14', codigo: 'RA002', descricao: 'Transferência de Propriedade', valor: 15000, dominio: 'registo-automovel', isento: false },
+  { id: '15', codigo: 'RA003', descricao: 'Certidão de Registo', valor: 3000, dominio: 'registo-automovel', isento: false },
+  
+  // Isenções
+  { id: '16', codigo: 'ISE001', descricao: 'Registo de Nascimento (Menores de 5 anos)', valor: 0, dominio: 'isencao', isento: true },
+  { id: '17', codigo: 'ISE002', descricao: '1ª Emissão de BI (Cidadãos carenciados)', valor: 0, dominio: 'isencao', isento: true }
 ];
 
-export const comarcas = ['São Paulo', 'Campinas', 'Guarulhos', 'Osasco', 'Santos', 'Ribeirão Preto'];
+// Categorias de funcionários
+export const categorias = [
+  'Técnico Superior',
+  'Técnico',
+  'Assistente Técnico',
+  'Assistente Operacional',
+  'Conservador',
+  'Notário',
+  'Oficial de Justiça',
+  'Escrivão',
+  'Director de Serviços'
+];
 
-export const responsaveis = [
-  'Dr. Carlos Mendes', 'Dra. Ana Beatriz', 'Dr. Roberto Lima', 'Dra. Patrícia Souza',
-  'Dr. Fernando Costa', 'Dra. Juliana Martins', 'Dr. Marcos Ribeiro', 'Dra. Camila Dias',
-  'Dr. André Nascimento', 'Dr. Paulo Henrique'
+// Serviços do Ministério
+export const servicos = [
+  'DRH - Direcção de Recursos Humanos',
+  'Gabinete Jurídico',
+  'GEPE - Gabinete de Estudos e Planeamento',
+  'Secretaria Geral',
+  'GTIC - Gabinete de Tecnologias de Informação',
+  'Registo Civil',
+  'Identificação Civil',
+  'Registo Criminal',
+  'Cartório Notarial',
+  'Registo Automóvel',
+  'Cofre Geral de Justiça'
 ];
