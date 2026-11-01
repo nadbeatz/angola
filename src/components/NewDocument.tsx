@@ -64,7 +64,7 @@ export default function NewDocument({ onCreated }: NewDocumentProps) {
     }));
   };
 
-  const handleDrag = (e: DragEvent) => {
+  const handleDrag = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     if (e.type === 'dragenter' || e.type === 'dragover') {
@@ -74,7 +74,7 @@ export default function NewDocument({ onCreated }: NewDocumentProps) {
     }
   };
 
-  const handleDrop = (e: DragEvent) => {
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);

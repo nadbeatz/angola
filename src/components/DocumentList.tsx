@@ -13,7 +13,7 @@ import {
   MoreVertical,
   X
 } from 'lucide-react';
-import { Document, DocumentStatus, DocumentType, Priority, CourtType } from '../types';
+import { Document } from '../types';
 import { mockDocuments } from '../data';
 
 interface DocumentListProps {
