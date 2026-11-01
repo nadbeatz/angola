@@ -9,7 +9,6 @@ import {
   Calendar,
   Users
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart } from 'recharts';
 import { mockDocuments, mockActivities } from '../data';
 
 const statusColors: Record<string, string> = {
@@ -18,14 +17,6 @@ const statusColors: Record<string, string> = {
   arquivado: 'bg-gray-500',
   aguardando: 'bg-amber-500',
   despachado: 'bg-purple-500',
-};
-
-const statusLabels: Record<string, string> = {
-  em_andamento: 'Em Andamento',
-  concluso: 'Concluído',
-  arquivado: 'Arquivado',
-  aguardando: 'Aguardando',
-  despachado: 'Despachado',
 };
 
 const priorityColors: Record<string, string> = {
@@ -67,6 +58,108 @@ const activityIcons: Record<string, string> = {
   movimentacao: '📋',
   despacho: '⚖️',
 };
+
+// Simple SVG Chart Components
+function AreaChart({ data }: { data: typeof monthlyData }) {
+  const maxVal = Math.max(...data.map(d => Math.max(d.documentos, d.concluidos)));
+  const width = 100;
+  const height = 40;
+  const padding = 2;
+
+  const createPath = (key: 'documentos' | 'concluidos') => {
+    const points = data.map((d, i) => {
+      const x = padding + (i * (width - 2 * padding)) / (data.length - 1);
+      const y = height - padding - ((d[key] / maxVal) * (height - 2 * padding));
+      return `${x},${y}`;
+    });
+    return `M ${points.join(' L ')}`;
+  };
+
+  return (
+    <div className="w-full h-64 relative">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="blueGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id="greenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#22c55e" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={`${createPath('documentos')} L ${width - padding},${height - padding} L ${padding},${height - padding} Z`} fill="url(#blueGrad)" />
+        <path d={createPath('documentos')} fill="none" stroke="#3b82f6" strokeWidth="0.5" />
+        <path d={`${createPath('concluidos')} L ${width - padding},${height - padding} L ${padding},${height - padding} Z`} fill="url(#greenGrad)" />
+        <path d={createPath('concluidos')} fill="none" stroke="#22c55e" strokeWidth="0.5" />
+      </svg>
+      <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2 text-xs text-gray-500">
+        {data.map(d => <span key={d.mes}>{d.mes}</span>)}
+      </div>
+    </div>
+  );
+}
+
+function PieChart({ data }: { data: typeof areaData }) {
+  const total = data.reduce((sum, d) => sum + d.value, 0);
+  let currentAngle = 0;
+
+  const paths = data.map(d => {
+    const angle = (d.value / total) * 360;
+    const startAngle = currentAngle;
+    const endAngle = currentAngle + angle;
+    currentAngle = endAngle;
+
+    const startRad = (startAngle - 90) * Math.PI / 180;
+    const endRad = (endAngle - 90) * Math.PI / 180;
+
+    const x1 = 50 + 35 * Math.cos(startRad);
+    const y1 = 50 + 35 * Math.sin(startRad);
+    const x2 = 50 + 35 * Math.cos(endRad);
+    const y2 = 50 + 35 * Math.sin(endRad);
+
+    const largeArc = angle > 180 ? 1 : 0;
+
+    return `M 50 50 L ${x1} ${y1} A 35 35 0 ${largeArc} 1 ${x2} ${y2} Z`;
+  });
+
+  return (
+    <div className="w-full h-48 flex items-center justify-center">
+      <svg viewBox="0 0 100 100" className="w-full h-full max-w-[200px]">
+        {paths.map((path, i) => (
+          <path key={i} d={path} fill={data[i].color} stroke="white" strokeWidth="0.5" />
+        ))}
+        <circle cx="50" cy="50" r="20" fill="white" />
+      </svg>
+    </div>
+  );
+}
+
+function BarChart({ data }: { data: typeof weeklyData }) {
+  const maxVal = Math.max(...data.map(d => Math.max(d.entradas, d.saidas)));
+  const barWidth = 12;
+  const gap = 4;
+
+  return (
+    <div className="w-full h-48 flex items-end justify-around px-4 gap-2">
+      {data.map((d, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+          <div className="flex items-end gap-1 h-32">
+            <div
+              className="bg-blue-500 rounded-t w-3 transition-all"
+              style={{ height: `${(d.entradas / maxVal) * 100}%` }}
+            />
+            <div
+              className="bg-green-500 rounded-t w-3 transition-all"
+              style={{ height: `${(d.saidas / maxVal) * 100}%` }}
+            />
+          </div>
+          <span className="text-xs text-gray-500">{d.dia}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const totalDocs = mockDocuments.length;
@@ -132,42 +225,14 @@ export default function Dashboard() {
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-green-500" /> Concluídos</span>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={monthlyData}>
-              <defs>
-                <linearGradient id="colorDocs" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorConc" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#22c55e" stopOpacity={0.15}/>
-                  <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="mes" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-              <Area type="monotone" dataKey="documentos" stroke="#3b82f6" strokeWidth={2.5} fill="url(#colorDocs)" />
-              <Area type="monotone" dataKey="concluidos" stroke="#22c55e" strokeWidth={2.5} fill="url(#colorConc)" />
-            </AreaChart>
-          </ResponsiveContainer>
+          <AreaChart data={monthlyData} />
         </div>
 
         {/* Pie Chart */}
         <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
           <h3 className="font-semibold text-gray-900 mb-1">Distribuição por Área</h3>
           <p className="text-sm text-gray-500 mb-4">Processos por área de atuação</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={areaData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
-                {areaData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-            </PieChart>
-          </ResponsiveContainer>
+          <PieChart data={areaData} />
           <div className="grid grid-cols-2 gap-2 mt-2">
             {areaData.map((item, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
@@ -186,16 +251,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
           <h3 className="font-semibold text-gray-900 mb-1">Atividade Semanal</h3>
           <p className="text-sm text-gray-500 mb-4">Entradas e saídas desta semana</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={weeklyData} barGap={4}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="dia" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-              <Bar dataKey="entradas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="saidas" fill="#22c55e" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <BarChart data={weeklyData} />
         </div>
 
         {/* Recent Documents */}

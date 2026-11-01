@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type DragEvent, type ChangeEvent, type FormEvent } from 'react';
 import {
   Upload,
   FileText,
@@ -64,7 +64,7 @@ export default function NewDocument({ onCreated }: NewDocumentProps) {
     }));
   };
 
-  const handleDrag = (e: React.DragEvent) => {
+  const handleDrag = (e: DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (e.type === 'dragenter' || e.type === 'dragover') {
@@ -74,7 +74,7 @@ export default function NewDocument({ onCreated }: NewDocumentProps) {
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = (e: DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
@@ -84,7 +84,7 @@ export default function NewDocument({ onCreated }: NewDocumentProps) {
     }
   };
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInput = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files).map(f => f.name);
       setFiles(prev => [...prev, ...newFiles]);
@@ -107,7 +107,7 @@ export default function NewDocument({ onCreated }: NewDocumentProps) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (validate()) {
       setSubmitted(true);

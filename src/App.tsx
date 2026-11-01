@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import DocumentList from './components/DocumentList';
@@ -243,7 +243,7 @@ function NotificationsView() {
     success: 'bg-green-100 text-green-600',
   };
 
-  const typeIcons: Record<string, React.ReactNode> = {
+  const typeIcons: Record<string, ReactNode> = {
     warning: <AlertTriangle className="w-4 h-4" />,
     info: <FileText className="w-4 h-4" />,
     success: <CheckCircle2 className="w-4 h-4" />,
