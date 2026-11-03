@@ -4,7 +4,6 @@ export interface User {
   id: string;
   username: string;
   email: string;
-  password: string;
   nome: string;
   perfil: 'admin' | 'super_user' | 'user';
   areas: string[];
