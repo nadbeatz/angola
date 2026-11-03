@@ -20,6 +20,25 @@ import {
   DollarSign
 } from 'lucide-react';
 
+
+const camposPorDominio: Record<string, { nome: string; campos: { chave: string; rotulo: string; tipo?: string; obrigatorio?: boolean }[] }> = {
+  'registo-civil': { nome: 'Dados do nascimento', campos: [
+    { chave: 'dataNascimento', rotulo: 'Data de nascimento', tipo: 'date', obrigatorio: true }, { chave: 'localNascimento', rotulo: 'Local de nascimento', obrigatorio: true }, { chave: 'sexo', rotulo: 'Sexo', tipo: 'select:Masculino|Feminino', obrigatorio: true }, { chave: 'nomePai', rotulo: 'Nome do pai' }, { chave: 'nomeMae', rotulo: 'Nome da mãe' }, { chave: 'termo', rotulo: 'N.º do termo / assento' }
+  ] },
+  identificacao: { nome: 'Dados de identificação', campos: [
+    { chave: 'dataNascimento', rotulo: 'Data de nascimento', tipo: 'date', obrigatorio: true }, { chave: 'nomePai', rotulo: 'Nome do pai' }, { chave: 'nomeMae', rotulo: 'Nome da mãe' }, { chave: 'tipoPedido', rotulo: 'Tipo de pedido', tipo: 'select:Primeira emissão|Renovação|2.ª via|Actualização', obrigatorio: true }, { chave: 'morada', rotulo: 'Morada' }
+  ] },
+  'registo-criminal': { nome: 'Dados do certificado', campos: [
+    { chave: 'finalidade', rotulo: 'Finalidade do certificado', obrigatorio: true }, { chave: 'entidadeDestino', rotulo: 'Entidade destinatária' }, { chave: 'numeroProcessoJudicial', rotulo: 'N.º do processo judicial (se aplicável)' }
+  ] },
+  cartorio: { nome: 'Dados do acto notarial', campos: [
+    { chave: 'tipoActo', rotulo: 'Tipo de acto', obrigatorio: true }, { chave: 'intervenientes', rotulo: 'Intervenientes' }, { chave: 'referenciaInstrumento', rotulo: 'Referência do instrumento' }
+  ] },
+  'registo-automovel': { nome: 'Dados do veículo', campos: [
+    { chave: 'matricula', rotulo: 'Matrícula', obrigatorio: true }, { chave: 'marcaModelo', rotulo: 'Marca / modelo' }, { chave: 'chassis', rotulo: 'N.º de chassis' }, { chave: 'tipoPedido', rotulo: 'Tipo de pedido', tipo: 'select:Registo inicial|Transferência|Alteração|2.ª via', obrigatorio: true }
+  ] }
+};
+
 interface ServicoModuleProps {
   titulo: string;
   dominio: string;
@@ -41,7 +60,8 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
     bi_nif: '',
     provincia: '',
     tipo: '',
-    observacoes: ''
+    observacoes: '',
+    dadosEspecificos: {} as Record<string, string>
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -53,6 +73,9 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
     else if (formData.bi_nif.length < 9) errors.bi_nif = 'BI/NIF inválido';
     if (!formData.provincia) errors.provincia = 'Província é obrigatória';
     if (!formData.tipo) errors.tipo = 'Tipo de serviço é obrigatório';
+    (camposPorDominio[dominio]?.campos || []).forEach(campo => {
+      if (campo.obrigatorio && !formData.dadosEspecificos[campo.chave]?.trim()) errors[campo.chave] = `${campo.rotulo} é obrigatório`;
+    });
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -72,11 +95,12 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
       dataCriacao: new Date().toISOString().split('T')[0],
       dataAtualizacao: new Date().toISOString().split('T')[0],
       provincia: formData.provincia,
-      observacoes: formData.observacoes
+      observacoes: formData.observacoes,
+      dadosEspecificos: formData.dadosEspecificos
     };
     setProcessos([novoProcesso, ...processos]);
     setShowForm(false);
-    setFormData({ requerente: '', bi_nif: '', provincia: '', tipo: '', observacoes: '' });
+    setFormData({ requerente: '', bi_nif: '', provincia: '', tipo: '', observacoes: '', dadosEspecificos: {} });
     setFormErrors({});
   };
 
@@ -302,6 +326,20 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
                   )}
                 </div>
               </div>
+              {camposPorDominio[dominio] && (
+                <section className="rounded-xl border border-gray-200 p-4 space-y-4">
+                  <h4 className="font-semibold text-gray-800">{camposPorDominio[dominio].nome}</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {camposPorDominio[dominio].campos.map(campo => (
+                      <div key={campo.chave}>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">{campo.rotulo}{campo.obrigatorio ? ' *' : ''}</label>
+                        {campo.tipo?.startsWith('select:') ? <select value={formData.dadosEspecificos[campo.chave] || ''} onChange={e => setFormData({...formData, dadosEspecificos: {...formData.dadosEspecificos, [campo.chave]: e.target.value}})} className="w-full px-4 py-3 border border-gray-200 rounded-lg"><option value="">Seleccione...</option>{campo.tipo.slice(7).split('|').map(op => <option key={op} value={op}>{op}</option>)}</select> : <input type={campo.tipo || 'text'} value={formData.dadosEspecificos[campo.chave] || ''} onChange={e => setFormData({...formData, dadosEspecificos: {...formData.dadosEspecificos, [campo.chave]: e.target.value}})} className="w-full px-4 py-3 border border-gray-200 rounded-lg" />}
+                        {formErrors[campo.chave] && <p className="text-xs text-red-600 mt-1">{formErrors[campo.chave]}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Observações
