@@ -1,30 +1,4 @@
-import { User, Delegacao, Emolumento } from './types';
-
-// Utilizadores padrão
-export const defaultUsers: User[] = [
-  {
-    id: '1',
-    username: 'admin',
-    email: 'admin@mjdh.gov.ao',
-    password: 'admin2026',
-    nome: 'Administrador do Sistema',
-    perfil: 'admin',
-    areas: ['todos'],
-    criadoEm: '2024-01-01',
-    ultimoAcesso: new Date().toISOString()
-  },
-  {
-    id: '2',
-    username: 'text',
-    email: 'text@mjdh.gov.ao',
-    password: 'text2026',
-    nome: 'Utilizador Padrão',
-    perfil: 'super_user',
-    areas: ['registo-nascimento', 'emissao-bi', 'registo-criminal', 'cartorio-notarial', 'registo-automovel', 'cofre-geral', 'delegacoes', 'gestao-documental'],
-    criadoEm: '2024-01-01',
-    ultimoAcesso: new Date().toISOString()
-  }
-];
+import { Delegacao, Emolumento } from './types';
 
 // 21 Províncias de Angola (incluindo as 4 novas de 2025)
 export const delegacoes: Delegacao[] = [
@@ -53,32 +27,21 @@ export const delegacoes: Delegacao[] = [
 
 // Tabela de emolumentos (Decretos 300/19 e 301/19)
 export const emolumentos: Emolumento[] = [
-  // Registo Civil
   { id: '1', codigo: 'RC001', descricao: 'Registo de Nascimento', valor: 2500, dominio: 'registo-civil', isento: false },
   { id: '2', codigo: 'RC002', descricao: 'Registo de Casamento', valor: 5000, dominio: 'registo-civil', isento: false },
   { id: '3', codigo: 'RC003', descricao: 'Registo de Óbito', valor: 2500, dominio: 'registo-civil', isento: false },
   { id: '4', codigo: 'RC004', descricao: 'Certidão de Nascimento', valor: 1500, dominio: 'registo-civil', isento: false },
-  
-  // Identificação Civil
   { id: '5', codigo: 'IC001', descricao: 'Emissão de BI (1ª vez)', valor: 3500, dominio: 'identificacao', isento: false },
   { id: '6', codigo: 'IC002', descricao: 'Emissão de BI (2ª vez)', valor: 5000, dominio: 'identificacao', isento: false },
   { id: '7', codigo: 'IC003', descricao: 'Duplicado de BI', valor: 7500, dominio: 'identificacao', isento: false },
-  
-  // Registo Criminal
   { id: '8', codigo: 'RCR001', descricao: 'Certificado do Registo Criminal', valor: 3000, dominio: 'registo-criminal', isento: false },
   { id: '9', codigo: 'RCR002', descricao: 'Certificado para fins de emprego', valor: 2000, dominio: 'registo-criminal', isento: false },
-  
-  // Cartório Notarial
   { id: '10', codigo: 'CN001', descricao: 'Escritura Pública', valor: 15000, dominio: 'cartorio', isento: false },
   { id: '11', codigo: 'CN002', descricao: 'Reconhecimento de Assinatura', valor: 1000, dominio: 'cartorio', isento: false },
   { id: '12', codigo: 'CN003', descricao: 'Autenticação de Documento', valor: 1500, dominio: 'cartorio', isento: false },
-  
-  // Registo Automóvel
   { id: '13', codigo: 'RA001', descricao: 'Registo de Viatura Nova', valor: 25000, dominio: 'registo-automovel', isento: false },
   { id: '14', codigo: 'RA002', descricao: 'Transferência de Propriedade', valor: 15000, dominio: 'registo-automovel', isento: false },
   { id: '15', codigo: 'RA003', descricao: 'Certidão de Registo', valor: 3000, dominio: 'registo-automovel', isento: false },
-  
-  // Isenções
   { id: '16', codigo: 'ISE001', descricao: 'Registo de Nascimento (Menores de 5 anos)', valor: 0, dominio: 'isencao', isento: true },
   { id: '17', codigo: 'ISE002', descricao: '1ª Emissão de BI (Cidadãos carenciados)', valor: 0, dominio: 'isencao', isento: true }
 ];
