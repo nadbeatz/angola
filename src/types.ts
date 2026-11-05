@@ -23,6 +23,7 @@ export interface Processo {
   dataAtualizacao: string;
   provincia: string;
   observacoes: string;
+  dadosAdicionais?: Record<string, string>;
 }
 
 export interface Funcionario {
