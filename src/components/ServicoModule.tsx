@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { emolumentos, delegacoes } from '../data';
 import { Processo } from '../types';
+import ServiceSpecificFields from './ServiceSpecificFields';
+import { birthRegistrationSchema, identitySchema, vehicleRegistrationSchema, cartorioSchema } from '../serviceSchemas';
 import { 
   Search, 
   Plus, 
@@ -35,6 +37,8 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
   const [showFilters, setShowFilters] = useState(false);
 
   const emols = emolumentos.filter(e => e.dominio === dominio || e.dominio === 'isencao');
+  const schema = dominio === 'registo-civil' ? birthRegistrationSchema : dominio === 'identificacao' ? identitySchema : dominio === 'registo-automovel' ? vehicleRegistrationSchema : dominio === 'cartorio' ? cartorioSchema : undefined;
+  const [extraData, setExtraData] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState({
     requerente: '',
@@ -72,11 +76,13 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
       dataCriacao: new Date().toISOString().split('T')[0],
       dataAtualizacao: new Date().toISOString().split('T')[0],
       provincia: formData.provincia,
-      observacoes: formData.observacoes
+      observacoes: formData.observacoes,
+      dadosAdicionais: extraData
     };
     setProcessos([novoProcesso, ...processos]);
     setShowForm(false);
     setFormData({ requerente: '', bi_nif: '', provincia: '', tipo: '', observacoes: '' });
+    setExtraData({});
     setFormErrors({});
   };
 
@@ -302,6 +308,7 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
                   )}
                 </div>
               </div>
+              <ServiceSpecificFields schema={schema} values={extraData} onChange={(name, value) => setExtraData(prev => ({ ...prev, [name]: value }))} />
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Observações
@@ -388,6 +395,7 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
                 </div>
               </div>
 
+              {showDetail.dadosAdicionais && Object.entries(showDetail.dadosAdicionais).some(([,v]) => v) && <div><p className="text-sm text-gray-500 mb-2">Dados específicos do serviço</p><div className="grid grid-cols-1 md:grid-cols-2 gap-3">{Object.entries(showDetail.dadosAdicionais).filter(([,v])=>v).map(([k,v])=><div key={k} className="bg-gray-50 p-3 rounded-lg"><p className="text-xs text-gray-500">{k}</p><p className="text-sm text-gray-800">{v}</p></div>)}</div></div>}
               {showDetail.observacoes && (
                 <div>
                   <p className="text-sm text-gray-500 mb-2">Observações</p>
