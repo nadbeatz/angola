@@ -1,551 +1,97 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { User } from '../types';
-import { delegacoes } from '../data';
-import { 
-  Baby, 
-  CreditCard, 
-  Shield, 
-  FileSignature, 
-  Car, 
-  Landmark, 
-  MapPin,
-  TrendingUp,
-  TrendingDown,
-  Users,
-  FileText,
-  Bell,
-  Calendar,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  BarChart3,
-  Activity,
-  Zap,
-  Target,
-  Award,
-  ArrowUpRight,
-  ArrowDownRight,
-  MoreVertical,
-  Eye,
-  Download,
-  Filter,
-  RefreshCw,
-  Settings
-} from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { Activity, AlertCircle, Baby, BarChart3, CheckCircle2, Clock, CreditCard, FileSignature, FileText, Landmark, MapPin, RefreshCw, Shield, Users } from 'lucide-react';
 
-interface DashboardProps {
-  user: User;
-}
+interface DashboardProps { user: User }
+interface Processo { id: string; numero: string; dominio: string; tipo: string; requerente: string; estado: string; provincia: string | null; created_at: string }
+
+const modules = [
+  { id: 'registo-civil', label: 'Registo de Nascimento', icon: Baby, color: 'bg-blue-600' },
+  { id: 'identificacao', label: 'Emissão do BI', icon: CreditCard, color: 'bg-green-600' },
+  { id: 'registo-criminal', label: 'Registo Criminal', icon: Shield, color: 'bg-red-600' },
+  { id: 'cartorio', label: 'Cartório Notarial', icon: FileSignature, color: 'bg-purple-600' },
+  { id: 'registo-automovel', label: 'Registo Automóvel', icon: Activity, color: 'bg-orange-600' },
+  { id: 'cofre-geral', label: 'Cofre Geral de Justiça', icon: Landmark, color: 'bg-amber-600' },
+];
+const labels: Record<string, string> = { pendente: 'Pendente', em_analise: 'Em análise', aprovado: 'Aprovado', concluido: 'Concluído', rejeitado: 'Rejeitado' };
+const formatDate = (value: string) => new Intl.DateTimeFormat('pt-AO', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
 
 export default function Dashboard({ user }: DashboardProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState('mes');
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [animatedValues, setAnimatedValues] = useState({
-    processos: 0,
-    delegacoes: 0,
-    funcionarios: 0,
-    hoje: 0
-  });
+  const [processos, setProcessos] = useState<Processo[]>([]);
+  const [staffCount, setStaffCount] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Animação de contagem
-  useEffect(() => {
-    const targets = { processos: 1746, delegacoes: 21, funcionarios: 337, hoje: 47 };
-    const duration = 1500;
-    const steps = 60;
-    const interval = duration / steps;
-    
-    let currentStep = 0;
-    const timer = setInterval(() => {
-      currentStep++;
-      const progress = currentStep / steps;
-      setAnimatedValues({
-        processos: Math.round(targets.processos * progress),
-        delegacoes: Math.round(targets.delegacoes * progress),
-        funcionarios: Math.round(targets.funcionarios * progress),
-        hoje: Math.round(targets.hoje * progress)
-      });
-      
-      if (currentStep >= steps) clearInterval(timer);
-    }, interval);
-    
-    return () => clearInterval(timer);
+  const loadDashboard = useCallback(async () => {
+    if (!supabase) { setError('A ligação à base de dados não está configurada.'); setLoading(false); return; }
+    setLoading(true); setError('');
+    try {
+      const [processResult, staffResult] = await Promise.all([
+        supabase.from('processos').select('id, numero, dominio, tipo, requerente, estado, provincia, created_at').order('created_at', { ascending: false }).limit(1000),
+        supabase.from('user_profiles').select('id', { count: 'exact', head: true }).eq('activo', true),
+      ]);
+      if (processResult.error) throw processResult.error;
+      if (staffResult.error) throw staffResult.error;
+      setProcessos((processResult.data ?? []) as Processo[]);
+      setStaffCount(staffResult.count ?? 0);
+      setLastUpdated(new Date());
+    } catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível carregar os indicadores.'); }
+    finally { setLoading(false); }
   }, []);
 
+  useEffect(() => { void loadDashboard(); }, [loadDashboard]);
+
+  const todayStart = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime();
+  const todayCount = processos.filter(p => new Date(p.created_at).getTime() >= todayStart).length;
+  const completed = processos.filter(p => p.estado === 'concluido').length;
+  const pending = processos.filter(p => ['pendente', 'em_analise'].includes(p.estado)).length;
+  const monthlyData = useMemo(() => {
+    const months = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(new Date().getFullYear(), new Date().getMonth() - 5 + i, 1);
+      return { key: d.getFullYear() + '-' + d.getMonth(), label: new Intl.DateTimeFormat('pt-AO', { month: 'short' }).format(d), total: 0, completed: 0 };
+    });
+    processos.forEach(p => {
+      const d = new Date(p.created_at); const item = months.find(m => m.key === d.getFullYear() + '-' + d.getMonth());
+      if (item) { item.total++; if (p.estado === 'concluido') item.completed++; }
+    });
+    return months;
+  }, [processos]);
+  const maxMonthly = Math.max(1, ...monthlyData.map(m => m.total));
+  const provinces = useMemo(() => {
+    const counts = new Map<string, number>();
+    processos.forEach(p => { const name = p.provincia?.trim(); if (name) counts.set(name, (counts.get(name) ?? 0) + 1); });
+    return [...counts.entries()].map(([nome, total]) => ({ nome, total })).sort((a, b) => b.total - a.total).slice(0, 5);
+  }, [processos]);
   const stats = [
-    { 
-      label: 'Total de Processos', 
-      value: animatedValues.processos, 
-      icon: FileText, 
-      color: 'from-blue-500 to-blue-600',
-      bgColor: 'bg-blue-50',
-      change: '+12.5%', 
-      trend: 'up' as const,
-      sparkline: [30, 45, 38, 52, 48, 61, 55, 67]
-    },
-    { 
-      label: 'Delegações Activas', 
-      value: animatedValues.delegacoes, 
-      icon: MapPin, 
-      color: 'from-green-500 to-green-600',
-      bgColor: 'bg-green-50',
-      change: '+4 novas', 
-      trend: 'up' as const,
-      sparkline: [15, 16, 17, 18, 19, 20, 21, 21]
-    },
-    { 
-      label: 'Funcionários', 
-      value: animatedValues.funcionarios, 
-      icon: Users, 
-      color: 'from-purple-500 to-purple-600',
-      bgColor: 'bg-purple-50',
-      change: '+8.3%', 
-      trend: 'up' as const,
-      sparkline: [280, 295, 305, 312, 320, 328, 333, 337]
-    },
-    { 
-      label: 'Processos Hoje', 
-      value: animatedValues.hoje, 
-      icon: Activity, 
-      color: 'from-orange-500 to-orange-600',
-      bgColor: 'bg-orange-50',
-      change: '+15.2%', 
-      trend: 'up' as const,
-      sparkline: [25, 32, 28, 38, 35, 42, 40, 47]
-    },
+    { label: 'Total de Processos', value: processos.length, icon: FileText, color: 'bg-blue-600' },
+    { label: 'Processos Hoje', value: todayCount, icon: Activity, color: 'bg-orange-600' },
+    { label: 'Em tratamento', value: pending, icon: Clock, color: 'bg-amber-600' },
+    { label: 'Concluídos', value: completed, icon: CheckCircle2, color: 'bg-green-600' },
   ];
 
-  const modules = [
-    { id: 'registo-nascimento', label: 'Registo de Nascimento', icon: Baby, count: 234, color: 'from-blue-500 to-blue-600', progress: 78, trend: '+12%' },
-    { id: 'emissao-bi', label: 'Emissão do BI', icon: CreditCard, count: 456, color: 'from-green-500 to-green-600', progress: 92, trend: '+18%' },
-    { id: 'registo-criminal', label: 'Registo Criminal', icon: Shield, count: 189, color: 'from-red-500 to-red-600', progress: 65, trend: '+5%' },
-    { id: 'cartorio-notarial', label: 'Cartório Notarial', icon: FileSignature, count: 312, color: 'from-purple-500 to-purple-600', progress: 85, trend: '+15%' },
-    { id: 'registo-automovel', label: 'Registo Automóvel', icon: Car, count: 278, color: 'from-orange-500 to-orange-600', progress: 71, trend: '+9%' },
-    { id: 'cofre-geral', label: 'Cofre Geral de Justiça', icon: Landmark, count: 277, color: 'from-yellow-500 to-yellow-600', progress: 88, trend: '+22%' },
-  ];
-
-  const recentActivity = [
-    { type: 'Registo de Nascimento', person: 'Maria da Silva', time: 'Há 5 minutos', status: 'Concluído', icon: Baby, color: 'bg-blue-500' },
-    { type: 'Emissão de BI', person: 'João Santos', time: 'Há 12 minutos', status: 'Em análise', icon: CreditCard, color: 'bg-green-500' },
-    { type: 'Registo Criminal', person: 'Ana Ferreira', time: 'Há 25 minutos', status: 'Concluído', icon: Shield, color: 'bg-red-500' },
-    { type: 'Cartório Notarial', person: 'Pedro Costa', time: 'Há 1 hora', status: 'Pendente', icon: FileSignature, color: 'bg-purple-500' },
-    { type: 'Registo Automóvel', person: 'Luanda Motors', time: 'Há 2 horas', status: 'Concluído', icon: Car, color: 'bg-orange-500' },
-    { type: 'Cofre Geral', person: 'Tribunal Provincial', time: 'Há 3 horas', status: 'Em análise', icon: Landmark, color: 'bg-yellow-500' },
-  ];
-
-  const notifications = [
-    { id: 1, title: 'Novo processo pendente', message: 'Registo de nascimento aguardando aprovação', time: 'Há 5 min', type: 'warning', read: false, icon: AlertCircle },
-    { id: 2, title: 'Processo concluído', message: 'BI emitido com sucesso para João Santos', time: 'Há 12 min', type: 'success', read: false, icon: CheckCircle2 },
-    { id: 3, title: 'Prazo a vencer', message: '3 processos com prazo vencendo amanhã', time: 'Há 1 hora', type: 'error', read: false, icon: AlertCircle },
-    { id: 4, title: 'Novo funcionário', message: 'Maria Silva foi adicionada ao DRH', time: 'Há 2 horas', type: 'info', read: true, icon: Users },
-    { id: 5, title: 'Atualização do sistema', message: 'Nova versão disponível: v2.5.0', time: 'Há 5 horas', type: 'info', read: true, icon: Zap },
-  ];
-
-  const chartData = [
-    { mes: 'Jan', processos: 120, concluidos: 95, receita: 450 },
-    { mes: 'Fev', processos: 145, concluidos: 118, receita: 520 },
-    { mes: 'Mar', processos: 168, concluidos: 142, receita: 610 },
-    { mes: 'Abr', processos: 192, concluidos: 165, receita: 695 },
-    { mes: 'Mai', processos: 215, concluidos: 189, receita: 780 },
-    { mes: 'Jun', processos: 238, concluidos: 212, receita: 865 },
-  ];
-
-  const maxProcessos = Math.max(...chartData.map(d => d.processos));
-
-  const topProvincias = [
-    { nome: 'Luanda', processos: 245, percentage: 100 },
-    { nome: 'Huambo', processos: 156, percentage: 64 },
-    { nome: 'Benguela', processos: 145, percentage: 59 },
-    { nome: 'Huíla', processos: 134, percentage: 55 },
-    { nome: 'Bié', processos: 98, percentage: 40 },
-  ];
-
-  const performanceMetrics = [
-    { label: 'Taxa de Conclusão', value: 89, target: 85, color: 'from-green-500 to-emerald-500' },
-    { label: 'Tempo Médio (dias)', value: 3.2, target: 5, color: 'from-blue-500 to-cyan-500' },
-    { label: 'Satisfação', value: 94, target: 90, color: 'from-purple-500 to-pink-500' },
-    { label: 'Eficiência', value: 92, target: 88, color: 'from-orange-500 to-red-500' },
-  ];
-
-  const quickActions = [
-    { label: 'Novo Processo', icon: FileText, color: 'bg-blue-500' },
-    { label: 'Emitir BI', icon: CreditCard, color: 'bg-green-500' },
-    { label: 'Registo Criminal', icon: Shield, color: 'bg-red-500' },
-    { label: 'Relatórios', icon: BarChart3, color: 'bg-purple-500' },
-  ];
-
-  return (
-    <div className="space-y-6">
-      {/* Header with Notifications */}
-      <div className="bg-gradient-to-r from-[#800706] via-[#5a0504] to-[#800706] rounded-2xl p-6 md:p-8 text-white relative overflow-hidden shadow-2xl">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -mr-48 -mt-48 animate-pulse" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white/5 rounded-full -ml-32 -mb-32" />
-        <div className="absolute top-1/2 right-1/4 w-32 h-32 bg-white/5 rounded-full" />
-        
-        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="px-3 py-1 bg-white/20 rounded-full text-xs font-semibold backdrop-blur-sm">
-                {new Date().toLocaleDateString('pt-AO', { weekday: 'long' })}
-              </span>
-              <span className="text-white/60 text-sm">
-                {new Date().toLocaleDateString('pt-AO', { day: 'numeric', month: 'long', year: 'numeric' })}
-              </span>
-            </div>
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">
-              Bem-vindo, {user.nome.split(' ')[0]}! 👋
-            </h1>
-            <p className="text-white/80 flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              {new Date().toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' })} • 
-              <span className="ml-1">{user.perfil === 'admin' ? 'Administrador' : 'Utilizador'}</span>
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button className="p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all backdrop-blur-sm hover:scale-105">
-              <RefreshCw className="w-5 h-5" />
-            </button>
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all backdrop-blur-sm hover:scale-105"
-              >
-                <Bell className="w-5 h-5" />
-                <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full text-xs flex items-center justify-center font-bold animate-pulse">
-                  {notifications.filter(n => !n.read).length}
-                </span>
-              </button>
-
-              {showNotifications && (
-                <div className="absolute right-0 mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 animate-fadeIn overflow-hidden">
-                  <div className="p-4 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-bold text-gray-900">Notificações</h3>
-                      <button className="text-xs text-[#800706] hover:text-[#5a0504] font-semibold">
-                        Marcar todas como lidas
-                      </button>
-                    </div>
-                  </div>
-                  <div className="max-h-96 overflow-y-auto">
-                    {notifications.map(notif => (
-                      <div key={notif.id} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!notif.read ? 'bg-blue-50/30' : ''}`}>
-                        <div className="flex items-start gap-3">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                            notif.type === 'success' ? 'bg-green-100' :
-                            notif.type === 'warning' ? 'bg-yellow-100' :
-                            notif.type === 'error' ? 'bg-red-100' : 'bg-blue-100'
-                          }`}>
-                            <notif.icon className={`w-5 h-5 ${
-                              notif.type === 'success' ? 'text-green-600' :
-                              notif.type === 'warning' ? 'text-yellow-600' :
-                              notif.type === 'error' ? 'text-red-600' : 'text-blue-600'
-                            }`} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-900">{notif.title}</p>
-                            <p className="text-xs text-gray-600 mt-1">{notif.message}</p>
-                            <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {notif.time}
-                            </p>
-                          </div>
-                          {!notif.read && (
-                            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2" />
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="p-3 bg-gray-50 border-t border-gray-100">
-                    <button className="w-full text-center text-sm text-[#800706] hover:text-[#5a0504] font-semibold py-2">
-                      Ver todas as notificações
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Cards with Sparklines */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, i) => (
-          <div key={i} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-xl transition-all hover:-translate-y-2 group">
-            <div className="flex items-start justify-between mb-4">
-              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${stat.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
-                <stat.icon className="w-7 h-7 text-white" />
-              </div>
-              <div className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-full ${
-                stat.trend === 'up' ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'
-              }`}>
-                {stat.trend === 'up' ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                {stat.change}
-              </div>
-            </div>
-            <div className="mb-3">
-              <p className="text-4xl font-bold text-gray-900 mb-1">{stat.value.toLocaleString('pt-AO')}</p>
-              <p className="text-sm text-gray-500 font-medium">{stat.label}</p>
-            </div>
-            {/* Sparkline */}
-            <div className="h-12 flex items-end gap-1">
-              {stat.sparkline.map((value, idx) => {
-                const max = Math.max(...stat.sparkline);
-                const height = (value / max) * 100;
-                return (
-                  <div
-                    key={idx}
-                    className={`flex-1 bg-gradient-to-t ${stat.color} rounded-t opacity-60 hover:opacity-100 transition-all`}
-                    style={{ height: `${height}%` }}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Main Chart */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-[#800706]" />
-              Evolução de Processos
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">Últimos 6 meses</p>
-          </div>
-          <div className="flex gap-2">
-            {['semana', 'mes', 'ano'].map(period => (
-              <button
-                key={period}
-                onClick={() => setSelectedPeriod(period)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  selectedPeriod === period
-                    ? 'bg-[#800706] text-white shadow-lg'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {period.charAt(0).toUpperCase() + period.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Enhanced Bar Chart */}
-        <div className="h-72 flex items-end justify-around gap-3 px-4 relative">
-          {/* Grid lines */}
-          <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
-            {[0, 1, 2, 3, 4].map(i => (
-              <div key={i} className="border-t border-gray-100 w-full" />
-            ))}
-          </div>
-          
-          {chartData.map((data, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-2 relative z-10">
-              <div className="w-full flex flex-col gap-1 items-center" style={{ height: '240px' }}>
-                <div className="w-full flex gap-1.5 items-end h-full group">
-                  <div
-                    className="flex-1 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-lg transition-all hover:opacity-80 cursor-pointer relative"
-                    style={{ height: `${(data.processos / maxProcessos) * 100}%` }}
-                  >
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                      {data.processos} processos
-                    </div>
-                  </div>
-                  <div
-                    className="flex-1 bg-gradient-to-t from-green-600 to-green-400 rounded-t-lg transition-all hover:opacity-80 cursor-pointer relative"
-                    style={{ height: `${(data.concluidos / maxProcessos) * 100}%` }}
-                  >
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                      {data.concluidos} concluídos
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <span className="text-sm text-gray-600 font-semibold">{data.mes}</span>
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center justify-center gap-8 mt-6 pt-4 border-t border-gray-100">
-          <span className="flex items-center gap-2 text-sm">
-            <span className="w-4 h-4 bg-gradient-to-t from-blue-600 to-blue-400 rounded" />
-            <span className="text-gray-600 font-medium">Processos Criados</span>
-          </span>
-          <span className="flex items-center gap-2 text-sm">
-            <span className="w-4 h-4 bg-gradient-to-t from-green-600 to-green-400 rounded" />
-            <span className="text-gray-600 font-medium">Processos Concluídos</span>
-          </span>
-        </div>
-      </div>
-
-      {/* Performance Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {performanceMetrics.map((metric, i) => (
-          <div key={i} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-lg transition-all">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold text-gray-700">{metric.label}</p>
-              <Target className="w-4 h-4 text-gray-400" />
-            </div>
-            <div className="flex items-end gap-2 mb-3">
-              <p className="text-3xl font-bold text-gray-900">{metric.value}</p>
-              <p className="text-sm text-gray-500 mb-1">/ {metric.target}</p>
-            </div>
-            <div className="relative">
-              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                <div
-                  className={`h-full bg-gradient-to-r ${metric.color} rounded-full transition-all duration-1000`}
-                  style={{ width: `${Math.min((metric.value / metric.target) * 100, 100)}%` }}
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-2 text-right">
-                {Math.round((metric.value / metric.target) * 100)}% da meta
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Modules Grid */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Módulos do Sistema</h2>
-          <button className="text-sm text-[#800706] hover:text-[#5a0504] font-semibold flex items-center gap-1">
-            Ver todos
-            <ArrowUpRight className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {modules.map(mod => (
-            <div key={mod.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer group">
-              <div className="flex items-start justify-between mb-4">
-                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${mod.color} flex items-center justify-center shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all`}>
-                  <mod.icon className="w-7 h-7 text-white" />
-                </div>
-                <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                  {mod.trend}
-                </span>
-              </div>
-              <h3 className="font-bold text-gray-900 mb-1">{mod.label}</h3>
-              <p className="text-sm text-gray-500 mb-3">{mod.count} processos activos</p>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-600 font-medium">Progresso mensal</span>
-                  <span className="font-bold text-gray-900">{mod.progress}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                  <div
-                    className={`h-full bg-gradient-to-r ${mod.color} rounded-full transition-all duration-1000`}
-                    style={{ width: `${mod.progress}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Activity */}
-        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-[#800706]" />
-              Actividade Recente
-            </h2>
-            <button className="text-sm text-[#800706] hover:text-[#5a0504] font-semibold">
-              Ver tudo
-            </button>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {recentActivity.map((activity, i) => (
-              <div key={i} className="p-4 hover:bg-gray-50 transition-colors group">
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 ${activity.color} rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform`}>
-                    <activity.icon className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900">{activity.type}</p>
-                    <p className="text-sm text-gray-500">{activity.person}</p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <span className={`
-                      inline-block px-3 py-1.5 rounded-full text-xs font-semibold
-                      ${activity.status === 'Concluído' ? 'bg-green-100 text-green-700' : 
-                        activity.status === 'Em análise' ? 'bg-blue-100 text-blue-700' : 
-                        'bg-yellow-100 text-yellow-700'}
-                    `}>
-                      {activity.status}
-                    </span>
-                    <p className="text-xs text-gray-400 mt-1 flex items-center gap-1 justify-end">
-                      <Clock className="w-3 h-3" />
-                      {activity.time}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Top Provincias */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-5 border-b border-gray-100">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Award className="w-5 h-5 text-[#800706]" />
-              Top Províncias
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">Por volume de processos</p>
-          </div>
-          <div className="p-5 space-y-4">
-            {topProvincias.map((provincia, i) => (
-              <div key={i} className="group">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white ${
-                      i === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' :
-                      i === 1 ? 'bg-gradient-to-br from-gray-300 to-gray-500' :
-                      i === 2 ? 'bg-gradient-to-br from-orange-400 to-orange-600' :
-                      'bg-gradient-to-br from-gray-400 to-gray-600'
-                    }`}>
-                      {i + 1}
-                    </div>
-                    <span className="font-semibold text-gray-900">{provincia.nome}</span>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">{provincia.processos}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-[#800706] to-[#5a0504] rounded-full transition-all duration-1000 group-hover:opacity-80"
-                    style={{ width: `${provincia.percentage}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="bg-gradient-to-r from-gray-50 to-white rounded-2xl p-6 border border-gray-100">
-        <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <Zap className="w-5 h-5 text-[#800706]" />
-          Acções Rápidas
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {quickActions.map((action, i) => (
-            <button
-              key={i}
-              className="flex flex-col items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-[#800706] hover:shadow-lg transition-all group"
-            >
-              <div className={`w-12 h-12 ${action.color} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                <action.icon className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-sm font-semibold text-gray-900 text-center">{action.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+  return <div className="space-y-6">
+    <section className="rounded-2xl bg-gradient-to-r from-[#800706] via-[#5a0504] to-[#800706] p-6 md:p-8 text-white shadow-xl">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div>
+        <p className="text-sm text-white/75">{new Date().toLocaleDateString('pt-AO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+        <h1 className="mt-2 text-3xl font-bold">Bem-vindo, {user.nome.split(' ')[0]}!</h1>
+        <p className="mt-2 text-sm text-white/80">{user.perfil === 'admin' ? 'Administrador' : 'Utilizador'} · Painel de gestão</p>
+        {lastUpdated && <p className="mt-1 text-xs text-white/60">Actualizado às {lastUpdated.toLocaleTimeString('pt-AO')}</p>}
+      </div><button onClick={() => void loadDashboard()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/15 px-4 py-3 text-sm font-semibold hover:bg-white/25 disabled:opacity-60"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar dados</button></div>
+    </section>
+    {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><AlertCircle className="mr-2 inline h-4 w-4" />{error}</div>}
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">{stats.map(s => <article key={s.label} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div className={`flex h-12 w-12 items-center justify-center rounded-xl ${s.color}`}><s.icon className="h-6 w-6 text-white" /></div><span className="text-xs text-gray-400">Dados reais</span></div><p className="mt-4 text-3xl font-bold text-gray-900">{loading ? '—' : s.value.toLocaleString('pt-AO')}</p><p className="mt-1 text-sm text-gray-500">{s.label}</p></article>)}</div>
+    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-6">
+      <div className="mb-6 flex items-center gap-2"><BarChart3 className="h-5 w-5 text-[#800706]" /><div><h2 className="font-bold text-gray-900">Evolução dos Processos</h2><p className="text-sm text-gray-500">Registos dos últimos seis meses</p></div></div>
+      {loading ? <p className="py-12 text-center text-sm text-gray-500">A carregar estatísticas…</p> : processos.length === 0 ? <p className="py-12 text-center text-sm text-gray-500">Ainda não existem processos registados para apresentar.</p> : <div className="flex h-64 items-end justify-around gap-3 border-b border-gray-100 px-2">{monthlyData.map(m => <div key={m.key} className="flex h-full flex-1 flex-col items-center justify-end gap-2"><span className="text-xs font-semibold text-gray-600">{m.total}</span><div className="flex h-[78%] w-full items-end justify-center gap-1"><div title={`${m.total} processos`} className="w-1/2 rounded-t-md bg-blue-500" style={{ height: `${m.total / maxMonthly * 100}%`, minHeight: m.total ? 4 : 0 }} /><div title={`${m.completed} concluídos`} className="w-1/2 rounded-t-md bg-green-500" style={{ height: `${m.completed / maxMonthly * 100}%`, minHeight: m.completed ? 4 : 0 }} /></div><span className="text-xs capitalize text-gray-500">{m.label}</span></div>)}</div>}
+      <div className="mt-4 flex justify-center gap-6 text-xs text-gray-600"><span><i className="mr-2 inline-block h-3 w-3 rounded-sm bg-blue-500" />Criados</span><span><i className="mr-2 inline-block h-3 w-3 rounded-sm bg-green-500" />Concluídos</span></div>
+    </section>
+    <section><h2 className="mb-4 text-lg font-bold text-gray-900">Módulos do Sistema</h2><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">{modules.map(m => { const count = processos.filter(p => p.dominio === m.id).length; return <article key={m.id} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm"><div className="flex items-center gap-3"><div className={`flex h-11 w-11 items-center justify-center rounded-xl ${m.color}`}><m.icon className="h-5 w-5 text-white" /></div><div><h3 className="font-semibold text-gray-900">{m.label}</h3><p className="text-sm text-gray-500">{loading ? 'A carregar…' : `${count} processos registados`}</p></div></div></article>; })}</div></section>
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm lg:col-span-2"><div className="border-b border-gray-100 p-5"><h2 className="flex items-center gap-2 font-bold text-gray-900"><Activity className="h-5 w-5 text-[#800706]" /> Actividade Recente</h2></div>{processos.length === 0 ? <p className="p-6 text-sm text-gray-500">Sem actividade registada.</p> : <div className="divide-y divide-gray-100">{processos.slice(0, 6).map(p => <div key={p.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><p className="font-semibold text-gray-900">{p.tipo || p.dominio} · {p.numero}</p><p className="text-sm text-gray-500">{p.requerente || 'Requerente não indicado'}</p><p className="text-xs text-gray-400">{formatDate(p.created_at)}</p></div><span className="w-fit rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">{labels[p.estado] ?? p.estado}</span></div>)}</div>}</section>
+      <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm"><h2 className="mb-1 flex items-center gap-2 font-bold text-gray-900"><MapPin className="h-5 w-5 text-[#800706]" /> Processos por Província</h2><p className="mb-5 text-sm text-gray-500">Distribuição dos registos</p>{provinces.length === 0 ? <p className="text-sm text-gray-500">Sem províncias registadas.</p> : <div className="space-y-4">{provinces.map(p => <div key={p.nome}><div className="mb-1 flex justify-between text-sm"><span className="font-medium text-gray-700">{p.nome}</span><span className="font-semibold text-gray-900">{p.total}</span></div><div className="h-2 overflow-hidden rounded-full bg-gray-100"><div className="h-full rounded-full bg-[#800706]" style={{ width: `${p.total / provinces[0].total * 100}%` }} /></div></div>)}</div>}<div className="mt-6 border-t border-gray-100 pt-4"><div className="flex items-center gap-2 text-sm text-gray-600"><Users className="h-4 w-4" /> Funcionários activos: <strong className="text-gray-900">{staffCount ?? '—'}</strong></div></div></section>
     </div>
-  );
+    <p className="text-center text-xs text-gray-400">Os indicadores respeitam as permissões de acesso definidas na base de dados.</p>
+  </div>;
 }
