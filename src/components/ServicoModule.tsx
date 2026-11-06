@@ -83,11 +83,12 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
   useEffect(() => {
     let active = true;
     const loadDocuments = async () => {
-      if (!supabase || !showDetail) {
+      const client = supabase;
+      if (!client || !showDetail) {
         setProcessDocuments([]);
         return;
       }
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('process_documents')
         .select('id, file_name, storage_path, created_at')
         .eq('processo_id', showDetail.id)
@@ -97,7 +98,7 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
         return;
       }
       const documents = await Promise.all(data.map(async document => {
-        const { data: signed } = await supabase.storage
+        const { data: signed } = await client.storage
           .from('process-documents')
           .createSignedUrl(document.storage_path, 60);
         return { id: document.id, file_name: document.file_name, created_at: document.created_at, signedUrl: signed?.signedUrl ?? '' };
