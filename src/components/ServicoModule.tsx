@@ -35,6 +35,7 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
   const [loadError, setLoadError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState<Processo | null>(null);
+  const [processDocuments, setProcessDocuments] = useState<Array<{ id: string; file_name: string; created_at: string; signedUrl: string }>>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('todos');
   const [showFilters, setShowFilters] = useState(false);
@@ -78,6 +79,34 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
     void loadProcessos();
     return () => { active = false; };
   }, [dominio]);
+
+  useEffect(() => {
+    let active = true;
+    const loadDocuments = async () => {
+      if (!supabase || !showDetail) {
+        setProcessDocuments([]);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('process_documents')
+        .select('id, file_name, storage_path, created_at')
+        .eq('processo_id', showDetail.id)
+        .order('created_at', { ascending: false });
+      if (error || !data) {
+        if (active) setProcessDocuments([]);
+        return;
+      }
+      const documents = await Promise.all(data.map(async document => {
+        const { data: signed } = await supabase.storage
+          .from('process-documents')
+          .createSignedUrl(document.storage_path, 60);
+        return { id: document.id, file_name: document.file_name, created_at: document.created_at, signedUrl: signed?.signedUrl ?? '' };
+      }));
+      if (active) setProcessDocuments(documents);
+    };
+    void loadDocuments();
+    return () => { active = false; };
+  }, [showDetail?.id]);
 
   const emols = emolumentos.filter(e => e.dominio === dominio || e.dominio === 'isencao');
   const schema = dominio === 'registo-civil' ? birthRegistrationSchema : dominio === 'identificacao' ? identitySchema : dominio === 'registo-automovel' ? vehicleRegistrationSchema : dominio === 'cartorio' ? cartorioSchema : undefined;
@@ -533,6 +562,21 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
                 </div>
               </div>
 
+              <div className="rounded-xl border border-gray-100 p-4">
+                <h4 className="mb-3 text-sm font-semibold text-gray-800">Documentos anexados</h4>
+                {processDocuments.length === 0 ? (
+                  <p className="text-sm text-gray-500">Ainda não existem documentos anexados a este processo.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {processDocuments.map(document => (
+                      <li key={document.id} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="truncate text-gray-700">{document.file_name}</span>
+                        {document.signedUrl && <a href={document.signedUrl} target="_blank" rel="noreferrer" className="shrink-0 font-medium text-[#800706] hover:underline">Abrir</a>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               {showDetail.dadosAdicionais && Object.entries(showDetail.dadosAdicionais).some(([,v]) => v) && <div><p className="text-sm text-gray-500 mb-2">Dados específicos do serviço</p><div className="grid grid-cols-1 md:grid-cols-2 gap-3">{Object.entries(showDetail.dadosAdicionais).filter(([,v])=>v).map(([k,v])=><div key={k} className="bg-gray-50 p-3 rounded-lg"><p className="text-xs text-gray-500">{k}</p><p className="text-sm text-gray-800">{v}</p></div>)}</div></div>}
               {showDetail.observacoes && (
                 <div>
