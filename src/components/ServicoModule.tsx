@@ -165,6 +165,22 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
     setFormErrors({});
   };
 
+  const updateEstado = async (estado: Processo['estado']) => {
+    if (!supabase || !showDetail) return;
+    const { error } = await supabase
+      .from('processos')
+      .update({ estado })
+      .eq('id', showDetail.id);
+    if (error) {
+      setLoadError(`Não foi possível actualizar o estado: ${error.message}`);
+      return;
+    }
+    const updated = { ...showDetail, estado, dataAtualizacao: new Date().toISOString().slice(0, 10) };
+    setShowDetail(updated);
+    setProcessos(current => current.map(item => item.id === updated.id ? updated : item));
+    setLoadError('');
+  };
+
   const filteredProcessos = processos.filter(p => {
     const matchSearch = p.requerente.toLowerCase().includes(searchTerm.toLowerCase()) ||
                        p.numero.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -492,18 +508,23 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
                 <p className="text-xs text-gray-500 mt-1">{showDetail.numero}</p>
               </div>
 
-              <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-100">
-                <button className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors font-medium">
-                  <Download className="w-4 h-4" />
-                  Download PDF
-                </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors font-medium">
+              <div className="space-y-3 pt-4 border-t border-gray-100">
+                <label className="block text-sm font-medium text-gray-700">
+                  Actualizar estado do processo
+                  <select
+                    value={showDetail.estado}
+                    onChange={e => void updateEstado(e.target.value as Processo['estado'])}
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2"
+                  >
+                    {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </label>
+                <button
+                  onClick={() => window.print()}
+                  className="inline-flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 font-medium text-gray-700 hover:bg-gray-200"
+                >
                   <Printer className="w-4 h-4" />
-                  Imprimir
-                </button>
-                <button className="flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors font-medium">
-                  <Edit className="w-4 h-4" />
-                  Editar
+                  Imprimir / Guardar PDF
                 </button>
               </div>
             </div>
