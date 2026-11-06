@@ -46,8 +46,7 @@ export default function GestaoDocumental(){
   }catch(err){setError(err instanceof Error?err.message:'Não foi possível registar o expediente.');}finally{setSaving(false);}
  };
  const update=async()=>{if(!supabase||!selected)return;setSaving(true);setError('');
-  try{const {error}=await supabase.from('expedientes').update({estado:nextStatus,destinatario:destination}).eq('id',selected.id);if(error)throw error;
-   if(dispatch.trim()){const {data:{user}}=await supabase.auth.getUser();if(user){const {error:moveError}=await supabase.from('expediente_movimentos').insert({expediente_id:selected.id,estado_anterior:selected.estado,estado_novo:nextStatus,destino:destination,despacho:dispatch,actor_id:user.id});if(moveError)throw moveError;}}
+  try{const {error}=await supabase.from('expedientes').update({estado:nextStatus,destinatario:destination,despacho_ultimo:dispatch}).eq('id',selected.id);if(error)throw error;
    setNotice('Tramitação actualizada.');setSelected({...selected,estado:nextStatus,destinatario:destination});await load();await openDetail({...selected,estado:nextStatus,destinatario:destination});
   }catch(err){setError(err instanceof Error?err.message:'Falha ao actualizar tramitação.');}finally{setSaving(false);}
  };
