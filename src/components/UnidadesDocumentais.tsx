@@ -18,6 +18,7 @@ export default function UnidadesDocumentais(){
  const [error,setError]=useState('');
  const [notice,setNotice]=useState('');
  const [editing,setEditing]=useState<Unidade|null>(null);
+ const [formOpen,setFormOpen]=useState(false);
  const [form,setForm]=useState(emptyForm);
 
  const load=useCallback(async()=>{
@@ -29,8 +30,8 @@ export default function UnidadesDocumentais(){
  },[]);
  useEffect(()=>{void load();},[load]);
 
- const startNew=()=>{setEditing(null);setForm(emptyForm);setError('');setNotice('');};
- const startEdit=(u:Unidade)=>{setEditing(u);setForm({codigo:u.codigo,nome:u.nome,tipo:u.tipo,unidade_pai_id:u.unidade_pai_id??''});setError('');setNotice('');};
+ const startNew=()=>{setEditing(null);setForm(emptyForm);setFormOpen(true);setError('');setNotice('');};
+ const startEdit=(u:Unidade)=>{setEditing(u);setFormOpen(true);setForm({codigo:u.codigo,nome:u.nome,tipo:u.tipo,unidade_pai_id:u.unidade_pai_id??''});setError('');setNotice('');};
  const save=async(e:React.FormEvent)=>{
   e.preventDefault();if(!supabase)return;
   setSaving(true);setError('');setNotice('');
@@ -41,7 +42,7 @@ export default function UnidadesDocumentais(){
     ? await supabase.from('unidades_documentais').update(payload).eq('id',editing.id)
     : await supabase.from('unidades_documentais').insert({...payload,criado_por:user.id});
    if(result.error)throw result.error;
-   setNotice(editing?'Unidade actualizada.':'Unidade criada.');setEditing(null);setForm(emptyForm);await load();
+   setNotice(editing?'Unidade actualizada.':'Unidade criada.');setEditing(null);setForm(emptyForm);setFormOpen(false);await load();
   }catch(err){setError(err instanceof Error?err.message:'Não foi possível guardar a unidade.');}
   finally{setSaving(false);}
  };
@@ -58,12 +59,12 @@ export default function UnidadesDocumentais(){
   </header>
   {error&&<p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
   {notice&&<p className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">{notice}</p>}
-  {(editing||form.codigo!==''||form.nome!==''||(!editing&&items.length===0))&&<form onSubmit={save} className="grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+  {formOpen&&<form onSubmit={save} className="grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
    <label className="text-sm font-medium">Código *<input required maxLength={30} value={form.codigo} onChange={e=>setForm({...form,codigo:e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g,'')})} placeholder="Ex.: DNRH" className="mt-1 w-full rounded-lg border p-2.5"/></label>
    <label className="text-sm font-medium sm:col-span-2">Nome da unidade *<input required minLength={2} maxLength={160} value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})} placeholder="Nome oficial da unidade" className="mt-1 w-full rounded-lg border p-2.5"/></label>
    <label className="text-sm font-medium">Tipo<select value={form.tipo} onChange={e=>setForm({...form,tipo:e.target.value as UnidadeTipo})} className="mt-1 w-full rounded-lg border p-2.5">{tipos.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}</select></label>
    <label className="text-sm font-medium sm:col-span-2">Unidade hierarquicamente superior<select value={form.unidade_pai_id} onChange={e=>setForm({...form,unidade_pai_id:e.target.value})} className="mt-1 w-full rounded-lg border p-2.5"><option value="">Sem unidade superior</option>{items.filter(i=>i.id!==editing?.id&&i.activo).map(i=><option key={i.id} value={i.id}>{i.codigo} — {i.nome}</option>)}</select></label>
-   <div className="flex items-end gap-2"><button disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-[#800706] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Save className="h-4 w-4"/>{saving?'A guardar…':'Guardar unidade'}</button><button type="button" onClick={startNew} className="rounded-lg border px-4 py-2.5 text-sm">Limpar</button></div>
+   <div className="flex items-end gap-2"><button disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-[#800706] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Save className="h-4 w-4"/>{saving?'A guardar…':'Guardar unidade'}</button><button type="button" onClick={()=>{setFormOpen(false);setEditing(null);setForm(emptyForm);}} className="rounded-lg border px-4 py-2.5 text-sm">Cancelar</button></div>
   </form>}
   <div className="overflow-hidden rounded-xl border bg-white">
    {loading?<div className="p-10 text-center text-gray-500"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin"/>A carregar unidades…</div>:items.length===0?<div className="p-10 text-center text-sm text-gray-500"><Building2 className="mx-auto mb-2 h-8 w-8 text-gray-300"/>Ainda não existem unidades registadas. Crie a primeira unidade orgânica.</div>:<div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-gray-50 text-xs uppercase text-gray-500"><tr><th className="px-4 py-3">Código</th><th className="px-4 py-3">Unidade</th><th className="px-4 py-3">Tipo</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3 text-right">Acções</th></tr></thead><tbody className="divide-y">{items.map(u=><tr key={u.id}><td className="px-4 py-3 font-mono font-semibold">{u.codigo}</td><td className="px-4 py-3 font-medium">{u.nome}</td><td className="px-4 py-3 capitalize">{tipos.find(t=>t.value===u.tipo)?.label??u.tipo}</td><td className="px-4 py-3"><span className={u.activo?'text-green-700':'text-gray-500'}>{u.activo?'Activa':'Inactiva'}</span></td><td className="px-4 py-3 text-right"><button onClick={()=>startEdit(u)} className="mr-2 rounded-lg border px-3 py-1.5">Editar</button><button onClick={()=>void toggle(u)} title={u.activo?'Desactivar':'Activar'} className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5">{u.activo?<ToggleRight className="h-4 w-4"/>:<ToggleLeft className="h-4 w-4"/>}{u.activo?'Desactivar':'Activar'}</button></td></tr>)}</tbody></table></div>}
