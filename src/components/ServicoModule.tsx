@@ -82,6 +82,7 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
   const emols = emolumentos.filter(e => e.dominio === dominio || e.dominio === 'isencao');
   const schema = dominio === 'registo-civil' ? birthRegistrationSchema : dominio === 'identificacao' ? identitySchema : dominio === 'registo-automovel' ? vehicleRegistrationSchema : dominio === 'cartorio' ? cartorioSchema : undefined;
   const [extraData, setExtraData] = useState<Record<string, string>>({});
+  const [extraFiles, setExtraFiles] = useState<Record<string, File[]>>({});
 
   const [formData, setFormData] = useState({
     requerente: '',
@@ -118,6 +119,16 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
       return;
     }
 
+    const selectedFiles = Object.values(extraFiles).flat();
+    const invalidFile = selectedFiles.find(file =>
+      file.size > 20 * 1024 * 1024 ||
+      !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)
+    );
+    if (invalidFile) {
+      setFormErrors({ general: 'Anexe apenas PDF, JPG ou PNG até 20 MB por ficheiro.' });
+      return;
+    }
+
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     const numero = `${dominio.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3)}-${now.slice(0, 10).replace(/-/g, '')}-${id.slice(0, 8).toUpperCase()}`;
@@ -144,6 +155,33 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
       return;
     }
 
+    let uploadWarning = '';
+    for (const [fieldName, files] of Object.entries(extraFiles)) {
+      for (const file of files) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const storagePath = `${data.id}/${crypto.randomUUID()}-${safeName}`;
+        const { error: uploadError } = await supabase.storage
+          .from('process-documents')
+          .upload(storagePath, file, { contentType: file.type, upsert: false });
+        if (uploadError) {
+          uploadWarning = `Processo guardado, mas o anexo "${file.name}" não foi enviado: ${uploadError.message}`;
+          continue;
+        }
+        const { error: metadataError } = await supabase.from('process_documents').insert({
+          processo_id: data.id,
+          storage_path: storagePath,
+          file_name: file.name,
+          mime_type: file.type,
+          file_size: file.size,
+          uploaded_by: authData.user.id,
+        });
+        if (metadataError) {
+          await supabase.storage.from('process-documents').remove([storagePath]);
+          uploadWarning = `Processo guardado, mas não foi possível registar o anexo "${file.name}".`;
+        }
+      }
+    }
+
     const novoProcesso: Processo = {
       id: data.id,
       numero: data.numero,
@@ -162,7 +200,9 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
     setShowForm(false);
     setFormData({ requerente: '', bi_nif: '', provincia: '', tipo: '', observacoes: '' });
     setExtraData({});
+    setExtraFiles({});
     setFormErrors({});
+    setLoadError(uploadWarning);
   };
 
   const updateEstado = async (estado: Processo['estado']) => {
@@ -406,7 +446,7 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
                   )}
                 </div>
               </div>
-              <ServiceSpecificFields schema={schema} values={extraData} onChange={(name, value) => setExtraData(prev => ({ ...prev, [name]: value }))} />
+              <ServiceSpecificFields schema={schema} values={extraData} onChange={(name, value) => setExtraData(prev => ({ ...prev, [name]: value }))} onFileChange={(name, files) => setExtraFiles(prev => ({ ...prev, [name]: files }))} />
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Observações
