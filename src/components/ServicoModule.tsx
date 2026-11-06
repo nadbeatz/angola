@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { emolumentos, delegacoes } from '../data';
 import { Processo } from '../types';
 import ServiceSpecificFields from './ServiceSpecificFields';
@@ -30,11 +31,53 @@ interface ServicoModuleProps {
 
 export default function ServicoModule({ titulo, dominio, icon }: ServicoModuleProps) {
   const [processos, setProcessos] = useState<Processo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [showDetail, setShowDetail] = useState<Processo | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('todos');
   const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const loadProcessos = async () => {
+      if (!supabase) {
+        setLoadError('A ligação à base de dados não está configurada.');
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('processos')
+        .select('id, numero, dominio, tipo, requerente, bi_nif, estado, valor, provincia, observacoes, dados_adicionais, created_at, updated_at')
+        .eq('dominio', dominio)
+        .order('created_at', { ascending: false });
+      if (!active) return;
+      if (error) {
+        setLoadError(error.message);
+      } else {
+        setLoadError('');
+        setProcessos((data ?? []).map(row => ({
+          id: row.id,
+          numero: row.numero,
+          tipo: row.tipo,
+          requerente: row.requerente,
+          bi_nif: row.bi_nif,
+          estado: row.estado as Processo['estado'],
+          valor: Number(row.valor),
+          dataCriacao: row.created_at.slice(0, 10),
+          dataAtualizacao: row.updated_at.slice(0, 10),
+          provincia: row.provincia,
+          observacoes: row.observacoes,
+          dadosAdicionais: (row.dados_adicionais ?? {}) as Record<string, string>,
+        })));
+      }
+      setLoading(false);
+    };
+    void loadProcessos();
+    return () => { active = false; };
+  }, [dominio]);
 
   const emols = emolumentos.filter(e => e.dominio === dominio || e.dominio === 'isencao');
   const schema = dominio === 'registo-civil' ? birthRegistrationSchema : dominio === 'identificacao' ? identitySchema : dominio === 'registo-automovel' ? vehicleRegistrationSchema : dominio === 'cartorio' ? cartorioSchema : undefined;
@@ -61,25 +104,61 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
+    if (!supabase) {
+      setFormErrors({ general: 'A ligação à base de dados não está configurada.' });
+      return;
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
+      setFormErrors({ general: 'A sessão expirou. Entre novamente no sistema.' });
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const numero = `${dominio.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3)}-${now.slice(0, 10).replace(/-/g, '')}-${id.slice(0, 8).toUpperCase()}`;
+    const { data, error } = await supabase
+      .from('processos')
+      .insert({
+        numero,
+        dominio,
+        tipo: formData.tipo,
+        requerente: formData.requerente.trim(),
+        bi_nif: formData.bi_nif.trim(),
+        estado: 'pendente',
+        valor: emols.find(item => item.descricao === formData.tipo)?.valor || 0,
+        provincia: formData.provincia,
+        observacoes: formData.observacoes.trim(),
+        dados_adicionais: extraData,
+        created_by: authData.user.id,
+      })
+      .select('id, numero, tipo, requerente, bi_nif, estado, valor, provincia, observacoes, dados_adicionais, created_at, updated_at')
+      .single();
+
+    if (error || !data) {
+      setFormErrors({ general: error?.message || 'Não foi possível guardar o processo.' });
+      return;
+    }
 
     const novoProcesso: Processo = {
-      id: Date.now().toString(),
-      numero: `${dominio.toUpperCase().substring(0, 3)}-${Date.now()}`,
-      tipo: formData.tipo,
-      requerente: formData.requerente,
-      bi_nif: formData.bi_nif,
-      estado: 'pendente',
-      valor: emols.find(e => e.descricao === formData.tipo)?.valor || 0,
-      dataCriacao: new Date().toISOString().split('T')[0],
-      dataAtualizacao: new Date().toISOString().split('T')[0],
-      provincia: formData.provincia,
-      observacoes: formData.observacoes,
-      dadosAdicionais: extraData
+      id: data.id,
+      numero: data.numero,
+      tipo: data.tipo,
+      requerente: data.requerente,
+      bi_nif: data.bi_nif,
+      estado: data.estado as Processo['estado'],
+      valor: Number(data.valor),
+      dataCriacao: data.created_at.slice(0, 10),
+      dataAtualizacao: data.updated_at.slice(0, 10),
+      provincia: data.provincia,
+      observacoes: data.observacoes,
+      dadosAdicionais: (data.dados_adicionais ?? {}) as Record<string, string>,
     };
-    setProcessos([novoProcesso, ...processos]);
+    setProcessos(current => [novoProcesso, ...current]);
     setShowForm(false);
     setFormData({ requerente: '', bi_nif: '', provincia: '', tipo: '', observacoes: '' });
     setExtraData({});
@@ -132,7 +211,7 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{titulo}</h1>
-            <p className="text-sm text-gray-500">{processos.length} processos registados</p>
+            <p className="text-sm text-gray-500">{loading ? 'A carregar processos…' : `${processos.length} processos registados`}</p>
           </div>
         </div>
         <button
@@ -181,6 +260,8 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
         </div>
       </div>
 
+      {loadError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{loadError}</div>}
+
       {/* Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
@@ -198,6 +279,7 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {formErrors.general && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{formErrors.general}</p>}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -477,7 +559,7 @@ export default function ServicoModule({ titulo, dominio, icon }: ServicoModulePr
       </div>
 
       {/* Process List */}
-      {filteredProcessos.length === 0 ? (
+      {loading ? <div className="rounded-xl border bg-white p-10 text-center text-gray-500">A carregar processos…</div> : filteredProcessos.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
           <FileText className="w-20 h-20 text-gray-300 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900">Nenhum processo encontrado</h3>
